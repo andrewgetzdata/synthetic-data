@@ -98,19 +98,18 @@ Write `{example-folder}/README.md` with:
    | column_name | VARCHAR | Primary key |
    | ... | ... | ... |
 
-3. **Relationships and join patterns** — an ASCII diagram showing how tables connect, plus example SQL joins:
+3. **Relationships and join patterns** — a Mermaid ER diagram (rendered natively by GitHub) showing tables, key columns, and FK relationships, plus example SQL joins:
 
+   ````markdown
+   ```mermaid
+   erDiagram
+       table_a ||--o{ table_b : "fk_column"
+       table_a {
+           varchar id PK
+           varchar name
+       }
    ```
-   vendors ─────────────── inventory
-                               │
-   staff ──── orders ──── order_items ──── menu_items
-                 │                              │
-              guests ──── reservations      recipes
-                 │
-              reviews
-                 │
-           campaigns ──── campaign_events
-   ```
+   ````
 
    **Common joins:**
    ```sql

@@ -155,38 +155,112 @@ python frying-nemo/generate.py
 
 ## Relationships
 
-```
-                    ┌──────────┐
-                    │ vendors  │
-                    └────┬─────┘
-                         │ vendor_id
-                    ┌────▼─────┐
-                    │inventory │
-                    └──────────┘
+```mermaid
+erDiagram
+    vendors ||--o{ inventory : "vendor_id"
+    menu_items ||--o{ recipes : "item_id"
+    menu_items ||--o{ order_items : "item_id"
+    staff ||--o{ orders : "server_id"
+    guests ||--o{ orders : "guest_id"
+    guests ||--o{ reservations : "guest_id"
+    guests ||--o{ reviews : "guest_id"
+    guests ||--o{ campaign_events : "guest_id"
+    orders ||--o{ order_items : "order_id"
+    campaigns ||--o{ campaign_events : "campaign_id"
 
-┌───────┐    server_id    ┌────────┐   order_id   ┌─────────────┐   item_id   ┌────────────┐
-│ staff ├────────────────►│ orders ├─────────────►│ order_items ├────────────►│ menu_items │
-└───────┘                 └───┬────┘              └─────────────┘             └──────┬─────┘
-                              │ guest_id                                            │ item_id
-                         ┌────▼────┐                                          ┌─────▼──────┐
-                         │ guests  │                                          │  recipes   │
-                         └┬───┬──┬─┘                                          └────────────┘
-              guest_id    │   │  │   guest_id
-          ┌───────────────┘   │  └──────────────┐
-     ┌────▼────────┐         │           ┌──────▼──┐
-     │reservations │         │           │ reviews │
-     └─────────────┘         │           └─────────┘
-                              │ guest_id
-                    ┌─────────▼──────────┐
-                    │  campaign_events   │
-                    └─────────┬──────────┘
-                              │ campaign_id
-                    ┌─────────▼──────────┐
-                    │    campaigns       │
-                    └────────────────────┘
-
-    daily_financials — derived/aggregated from orders, staff, campaigns
+    vendors {
+        varchar vendor_id PK
+        varchar name
+        varchar category
+        varchar payment_terms
+    }
+    staff {
+        varchar staff_id PK
+        varchar first_name
+        varchar last_name
+        varchar role
+        date hire_date
+        float hourly_rate
+    }
+    menu_items {
+        varchar item_id PK
+        varchar name
+        varchar category
+        float price
+        float cost
+    }
+    recipes {
+        varchar recipe_id PK
+        varchar item_id FK
+        varchar ingredient
+        float quantity
+        varchar unit
+    }
+    inventory {
+        varchar ingredient_id PK
+        varchar name
+        float qty_on_hand
+        float unit_cost
+        varchar vendor_id FK
+    }
+    guests {
+        varchar guest_id PK
+        varchar first_name
+        varchar last_name
+        varchar email
+        int visit_count
+    }
+    reservations {
+        varchar reservation_id PK
+        varchar guest_id FK
+        date reservation_date
+        int party_size
+        varchar status
+    }
+    orders {
+        varchar order_id PK
+        timestamp order_timestamp
+        varchar server_id FK
+        varchar guest_id FK
+        float subtotal
+        float total
+    }
+    order_items {
+        varchar order_item_id PK
+        varchar order_id FK
+        varchar item_id FK
+        int quantity
+        float unit_price
+    }
+    reviews {
+        varchar review_id PK
+        varchar guest_id FK
+        int rating
+        varchar review_text
+        varchar platform
+    }
+    campaigns {
+        varchar campaign_id PK
+        varchar name
+        varchar channel
+        float budget
+    }
+    campaign_events {
+        varchar event_id PK
+        varchar campaign_id FK
+        varchar event_type
+        varchar guest_id FK
+    }
+    daily_financials {
+        date financial_date PK
+        float revenue
+        float cogs
+        float labor_cost
+        float net_income
+    }
 ```
+
+> `daily_financials` is derived/aggregated from orders, staff, and campaigns — no direct FK relationships.
 
 ## Common Joins
 
