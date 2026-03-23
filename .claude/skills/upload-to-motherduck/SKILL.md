@@ -38,9 +38,9 @@ The MotherDuck cloud MCP cannot read local files. Use local DuckDB with the `md:
 
 All synthetic data goes into the `synthetic_data` database (created if it doesn't exist). Each example folder gets its own schema within that database.
 
-Run via Bash:
+Run via Bash (source `.env` first to pick up the token):
 ```python
-.venv/bin/python -c "
+source .env && .venv/bin/python -c "
 import duckdb, glob
 
 con = duckdb.connect('md:synthetic_data')
@@ -56,7 +56,7 @@ con.close()
 "
 ```
 
-If authentication fails, tell the user to run `! .venv/bin/python -c "import duckdb; duckdb.connect('md:')"` to complete browser SSO, or set `MOTHERDUCK_TOKEN` in `.env`.
+If authentication fails, ensure `.env` contains `motherduck_token=<token>`. The user can generate a new token by running `! .venv/bin/python -c "import duckdb; duckdb.connect('md:')"` to complete browser SSO.
 
 ### 5. Verify the upload
 
