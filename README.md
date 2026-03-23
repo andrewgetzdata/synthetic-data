@@ -17,8 +17,11 @@ python frying-nemo/generate.py
 ```mermaid
 erDiagram
     vendors ||--o{ inventory : "vendor_id"
+    inventory ||--o{ recipes : "ingredient_id"
     menu_items ||--o{ recipes : "item_id"
     menu_items ||--o{ order_items : "item_id"
+    staff ||--o{ staff_schedule : "staff_id"
+    staff ||--o{ staff_costs : "staff_id"
     staff ||--o{ orders : "server_id"
     guests ||--o{ orders : "guest_id"
     guests ||--o{ reservations : "guest_id"
@@ -29,8 +32,14 @@ erDiagram
 
     vendors { varchar vendor_id PK }
     staff { varchar staff_id PK }
+    staff_schedule { varchar schedule_id PK
+                     varchar staff_id FK }
+    staff_costs { varchar staff_cost_id PK
+                  varchar staff_id FK }
     menu_items { varchar item_id PK }
-    recipes { varchar recipe_id PK }
+    recipes { varchar recipe_id PK
+              varchar item_id FK
+              varchar ingredient_id FK }
     inventory { varchar ingredient_id PK }
     guests { varchar guest_id PK }
     reservations { varchar reservation_id PK }

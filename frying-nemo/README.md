@@ -32,6 +32,28 @@ python frying-nemo/generate.py
 | hourly_rate | FLOAT | Pay rate |
 | is_active | BOOLEAN | Currently employed |
 
+### `staff_schedule`
+| Column | Type | Description |
+|--------|------|-------------|
+| schedule_id | VARCHAR | Primary key (SCH-XXXX) |
+| staff_id | VARCHAR | FK -> staff |
+| day_of_week | VARCHAR | monday through sunday |
+| shift | VARCHAR | morning, lunch, dinner, full |
+| start_time | VARCHAR | Shift start (e.g., 10:00) |
+| end_time | VARCHAR | Shift end (e.g., 22:00) |
+
+### `staff_costs`
+| Column | Type | Description |
+|--------|------|-------------|
+| staff_cost_id | VARCHAR | Primary key (STC-XXXX) |
+| staff_id | VARCHAR | FK -> staff |
+| comp_type | VARCHAR | salaried, hourly_tipped, hourly_nontipped |
+| hourly_rate | FLOAT | Base hourly rate |
+| annual_salary | FLOAT | Annual salary (nullable, salaried only) |
+| effective_hourly_rate | FLOAT | Effective rate (salary / 2080 for salaried) |
+| avg_tips_per_hour | FLOAT | Average tips/hr (tipped roles only, else 0) |
+| is_active | BOOLEAN | Currently employed |
+
 ### `menu_items`
 | Column | Type | Description |
 |--------|------|-------------|
@@ -47,7 +69,7 @@ python frying-nemo/generate.py
 |--------|------|-------------|
 | recipe_id | VARCHAR | Primary key (RCP-XXXX) |
 | item_id | VARCHAR | FK -> menu_items |
-| ingredient | VARCHAR | Ingredient name |
+| ingredient_id | VARCHAR | FK -> inventory |
 | quantity | FLOAT | Amount needed |
 | unit | VARCHAR | oz, lb, g, cup, tbsp, tsp, each, ml |
 
@@ -158,8 +180,11 @@ python frying-nemo/generate.py
 ```mermaid
 erDiagram
     vendors ||--o{ inventory : "vendor_id"
+    inventory ||--o{ recipes : "ingredient_id"
     menu_items ||--o{ recipes : "item_id"
     menu_items ||--o{ order_items : "item_id"
+    staff ||--o{ staff_schedule : "staff_id"
+    staff ||--o{ staff_costs : "staff_id"
     staff ||--o{ orders : "server_id"
     guests ||--o{ orders : "guest_id"
     guests ||--o{ reservations : "guest_id"
@@ -182,6 +207,23 @@ erDiagram
         date hire_date
         float hourly_rate
     }
+    staff_schedule {
+        varchar schedule_id PK
+        varchar staff_id FK
+        varchar day_of_week
+        varchar shift
+        varchar start_time
+        varchar end_time
+    }
+    staff_costs {
+        varchar staff_cost_id PK
+        varchar staff_id FK
+        varchar comp_type
+        float hourly_rate
+        float annual_salary
+        float effective_hourly_rate
+        float avg_tips_per_hour
+    }
     menu_items {
         varchar item_id PK
         varchar name
@@ -192,7 +234,7 @@ erDiagram
     recipes {
         varchar recipe_id PK
         varchar item_id FK
-        varchar ingredient
+        varchar ingredient_id FK
         float quantity
         varchar unit
     }

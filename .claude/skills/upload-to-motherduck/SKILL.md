@@ -38,9 +38,9 @@ The MotherDuck cloud MCP cannot read local files. Use local DuckDB with the `md:
 
 All synthetic data goes into the `synthetic_data` database (created if it doesn't exist). Each example folder gets its own schema within that database.
 
-Run via Bash (source `.env` first to pick up the token):
+Run via Bash (export vars from `.env` so DuckDB picks up the token):
 ```python
-source .env && .venv/bin/python -c "
+set -a && source .env && set +a && .venv/bin/python -c "
 import duckdb, glob
 
 con = duckdb.connect('md:synthetic_data')

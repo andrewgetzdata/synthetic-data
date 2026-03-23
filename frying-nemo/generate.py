@@ -104,18 +104,29 @@ VENDOR_DATA = [
     ("CleanRight Supply", "supplies", "net_30"),
 ]
 
-ROLES_CONFIG: dict[str, tuple[int, float, float]] = {
-    "manager": (2, 28.00, 35.00),
-    "chef": (2, 22.00, 30.00),
-    "sous_chef": (2, 18.00, 24.00),
-    "line_cook": (4, 15.00, 20.00),
-    "prep_cook": (3, 14.00, 17.00),
-    "server": (5, 12.00, 16.00),
-    "bartender": (2, 14.00, 19.00),
-    "host": (2, 13.00, 16.00),
-    "busser": (2, 12.00, 14.00),
-    "dishwasher": (1, 12.00, 14.00),
+# (count, rate_min, rate_max, comp_type)
+# comp_type: salaried, hourly_tipped, hourly_nontipped
+ROLES_CONFIG: dict[str, tuple[int, float, float, str]] = {
+    "manager": (2, 28.00, 35.00, "salaried"),
+    "chef": (2, 22.00, 30.00, "hourly_nontipped"),
+    "sous_chef": (2, 18.00, 24.00, "hourly_nontipped"),
+    "line_cook": (4, 15.00, 20.00, "hourly_nontipped"),
+    "prep_cook": (3, 14.00, 17.00, "hourly_nontipped"),
+    "server": (5, 12.00, 16.00, "hourly_tipped"),
+    "bartender": (2, 14.00, 19.00, "hourly_tipped"),
+    "host": (2, 13.00, 16.00, "hourly_nontipped"),
+    "busser": (2, 12.00, 14.00, "hourly_tipped"),
+    "dishwasher": (1, 12.00, 14.00, "hourly_nontipped"),
 }
+
+SHIFT_TIMES = {
+    "morning": ("07:00", "15:00"),
+    "lunch": ("10:00", "16:00"),
+    "dinner": ("16:00", "23:00"),
+    "full": ("10:00", "22:00"),
+}
+
+MANAGER_SALARY_RANGE = (52_000.0, 72_000.0)
 
 INGREDIENTS = [
     ("Atlantic Salmon Fillet", "lb", 12.50, "seafood"),
@@ -220,7 +231,7 @@ def generate_vendors() -> list[dict[str, object]]:
 def generate_staff() -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     idx = 1
-    for role, (count, rate_min, rate_max) in ROLES_CONFIG.items():
+    for role, (count, rate_min, rate_max, _comp) in ROLES_CONFIG.items():
         for _ in range(count):
             hire = fake.date_between(
                 start_date=date(2020, 1, 1), end_date=DATE_START
@@ -237,6 +248,94 @@ def generate_staff() -> list[dict[str, object]]:
                 }
             )
             idx += 1
+    return rows
+
+
+def generate_staff_schedule(
+    staff: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Weekly schedule for each active staff member."""
+    rows: list[dict[str, object]] = []
+    idx = 1
+    days = [
+        "monday", "tuesday", "wednesday", "thursday",
+        "friday", "saturday", "sunday",
+    ]
+
+    for s in staff:
+        if not s["is_active"]:
+            continue
+        role = str(s["role"])
+        # managers work 5 days full shift
+        if role == "manager":
+            work_days = random.sample(days, 5)
+            shift = "full"
+        # BOH roles: morning or lunch shifts
+        elif role in ("chef", "sous_chef", "line_cook", "prep_cook", "dishwasher"):
+            work_days = random.sample(days, random.choice([4, 5]))
+            shift = random.choice(["morning", "lunch", "dinner"])
+        # FOH roles: lunch or dinner shifts
+        else:
+            work_days = random.sample(days, random.choice([4, 5]))
+            shift = random.choice(["lunch", "dinner"])
+
+        for day in work_days:
+            start_time, end_time = SHIFT_TIMES[shift]
+            rows.append(
+                {
+                    "schedule_id": _uid("SCH", idx),
+                    "staff_id": s["staff_id"],
+                    "day_of_week": day,
+                    "shift": shift,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                }
+            )
+            idx += 1
+    return rows
+
+
+def generate_staff_costs(
+    staff: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Compensation details for each staff member."""
+    rows: list[dict[str, object]] = []
+    idx = 1
+
+    role_comp_map = {r: cfg[3] for r, cfg in ROLES_CONFIG.items()}
+
+    for s in staff:
+        role = str(s["role"])
+        comp_type = role_comp_map[role]
+        hourly_rate = float(s["hourly_rate"])
+
+        if comp_type == "salaried":
+            annual_salary = round(
+                random.uniform(*MANAGER_SALARY_RANGE), 2
+            )
+            effective_hourly = round(annual_salary / 2080, 2)
+        else:
+            annual_salary = None
+            effective_hourly = hourly_rate
+
+        if comp_type == "hourly_tipped":
+            avg_tips_per_hour = round(random.uniform(8.0, 18.0), 2)
+        else:
+            avg_tips_per_hour = 0.0
+
+        rows.append(
+            {
+                "staff_cost_id": _uid("STC", idx),
+                "staff_id": s["staff_id"],
+                "comp_type": comp_type,
+                "hourly_rate": hourly_rate,
+                "annual_salary": annual_salary,
+                "effective_hourly_rate": effective_hourly,
+                "avg_tips_per_hour": avg_tips_per_hour,
+                "is_active": s["is_active"],
+            }
+        )
+        idx += 1
     return rows
 
 
@@ -261,7 +360,7 @@ def generate_menu_items() -> list[dict[str, object]]:
 
 def generate_recipes(
     menu_items: list[dict[str, object]],
-    ingredients: list[dict[str, object]],
+    inventory: list[dict[str, object]],
 ) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     idx = 1
@@ -272,14 +371,14 @@ def generate_recipes(
         else:
             n_ingredients = random.randint(2, 6)
         chosen = random.sample(
-            ingredients, min(n_ingredients, len(ingredients))
+            inventory, min(n_ingredients, len(inventory))
         )
         for ing in chosen:
             rows.append(
                 {
                     "recipe_id": _uid("RCP", idx),
                     "item_id": item["item_id"],
-                    "ingredient": ing["name"],
+                    "ingredient_id": ing["ingredient_id"],
                     "quantity": round(random.uniform(0.5, 8.0), 2),
                     "unit": random.choice(units),
                 }
@@ -386,13 +485,32 @@ def generate_orders_and_items(
     staff: list[dict[str, object]],
     guests: list[dict[str, object]],
     menu_items: list[dict[str, object]],
+    schedule: list[dict[str, object]],
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     orders: list[dict[str, object]] = []
     items: list[dict[str, object]] = []
     order_idx = 1
     item_idx = 1
 
-    servers = [s for s in staff if s["role"] in ("server", "bartender")]
+    server_ids = {
+        s["staff_id"] for s in staff if s["role"] in ("server", "bartender")
+    }
+    all_servers = [s for s in staff if s["staff_id"] in server_ids]
+
+    # Build schedule lookup: (day_name, shift) -> list of server staff_ids
+    day_names = [
+        "monday", "tuesday", "wednesday", "thursday",
+        "friday", "saturday", "sunday",
+    ]
+    schedule_lookup: dict[tuple[str, str], list[str]] = {}
+    for sch in schedule:
+        sid = str(sch["staff_id"])
+        if sid not in server_ids:
+            continue
+        key = (str(sch["day_of_week"]), str(sch["shift"]))
+        schedule_lookup.setdefault(key, []).append(sid)
+
+    staff_by_id = {str(s["staff_id"]): s for s in staff}
     active_items = [m for m in menu_items if m["is_active"]]
     entrees = [m for m in active_items if m["category"] == "entree"]
     appetizers = [m for m in active_items if m["category"] == "appetizer"]
@@ -420,17 +538,31 @@ def generate_orders_and_items(
 
         n_orders = max(10, int(random.gauss(base, base * 0.15)))
 
+        day_name = day_names[dow]
+
         for _ in range(n_orders):
             # lunch (11:30-14:00) or dinner (17:00-21:30)
             if random.random() < 0.35:
                 hour = random.randint(11, 13)
                 minute = random.choice([0, 15, 30, 45])
+                shift = "lunch"
             else:
                 hour = random.randint(17, 21)
                 minute = random.choice([0, 15, 30, 45])
+                shift = "dinner"
 
             ts = datetime(current.year, current.month, current.day, hour, minute)
-            server = random.choice(servers)
+
+            # pick a server scheduled for this day/shift
+            scheduled = schedule_lookup.get((day_name, shift), [])
+            # also include "full" shift servers
+            scheduled += schedule_lookup.get((day_name, "full"), [])
+            if scheduled:
+                sid = random.choice(scheduled)
+                server = staff_by_id[sid]
+            else:
+                server = random.choice(all_servers)
+
             guest = random.choice(guests) if random.random() > 0.3 else None
             table = random.randint(1, 20)
 
@@ -815,14 +947,20 @@ def main() -> None:
     staff = generate_staff()
     write_parquet(staff, "staff")
 
+    staff_schedule = generate_staff_schedule(staff)
+    write_parquet(staff_schedule, "staff_schedule")
+
+    staff_costs = generate_staff_costs(staff)
+    write_parquet(staff_costs, "staff_costs")
+
     menu_items = generate_menu_items()
     write_parquet(menu_items, "menu_items")
 
-    recipes = generate_recipes(menu_items, [{"name": i[0]} for i in INGREDIENTS])
-    write_parquet(recipes, "recipes")
-
     inventory = generate_inventory(vendors)
     write_parquet(inventory, "inventory")
+
+    recipes = generate_recipes(menu_items, inventory)
+    write_parquet(recipes, "recipes")
 
     guests = generate_guests()
     write_parquet(guests, "guests")
@@ -830,7 +968,9 @@ def main() -> None:
     reservations = generate_reservations(guests)
     write_parquet(reservations, "reservations")
 
-    orders, order_items = generate_orders_and_items(staff, guests, menu_items)
+    orders, order_items = generate_orders_and_items(
+        staff, guests, menu_items, staff_schedule
+    )
     write_parquet(orders, "orders")
     write_parquet(order_items, "order_items")
 
